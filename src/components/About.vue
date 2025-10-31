@@ -14,7 +14,7 @@
       VideoTutorialButton(:url="$t('video-tutorial-button.url')")
 </template>
 <script>
-import VideoTutorialButton from './Common/VideoTutorialButton'
+import VideoTutorialButton from './Common/VideoTutorialButton.vue'
 export default {
   components: {
     VideoTutorialButton

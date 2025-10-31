@@ -1,29 +1,55 @@
-import firebase from 'firebase/app'
-
+import {supabase} from '../helpers/supabaseConfig'
 import User from './UserModel'
 
 export default {
   state: {
-    user: null
+    user: null,
+    lastUpdate: null
   },
   mutations: {
-    setUser (state, payload) {
-      state.user = payload
-    }
-  },
-  actions: {
-    // Login page
-    // Сейчас не используется, так как аутентификация только при помощи службы Гугл
+    setUser(state, payload) {
+      // Проверяем, действительно ли изменился пользователь
+      const currentId = state.user?.id
+      const newId = payload?.id
+      
+      if (currentId !== newId) {
+        state.user = payload
+        state.lastUpdate = payload ? new Date().getTime() : null
+        console.log('👤 User state updated:', payload ? payload.id : 'null')
+      } else {
+        console.log('👤 User state unchanged, skipping update')
+      }
+    },
     async loginUser ({commit}, {email, password}) {
       commit('clearError')
       commit('setLoading', true)
       try {
-        // logic
-        const user = await firebase.auth().signInWithEmailAndPassword(email, password)
-        commit('setUser', new User(user.user.uid, user.user.displayName, user.user.photoURL))
-
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+        
+        if (error) {
+          console.error('❌ Auth error:', error)
+          // Специальная обработка ошибок аутентификации
+          if (error.message.includes('session') || error.message.includes('token')) {
+            throw new Error('Authentication session error. Please try again.')
+          }
+          throw error
+        }
+        
+        const user = new User(
+          data.user.id, 
+          data.user.user_metadata?.full_name || data.user.email, 
+          data.user.user_metadata?.avatar_url,
+          data.user.email
+        )
+        commit('setUser', user)
         commit('setLoading', false)
+        
+        return user
       } catch (error) {
+        console.error('❌ Login failed:', error)
         commit('setLoading', false)
         commit('setError', error.message)
         throw error
@@ -35,30 +61,40 @@ export default {
       commit('setUser', new User(payload.uid, payload.displayName, payload.photoURL, payload.email))
     },
     // Logout
-    logoutUser ({commit}) {
-      firebase.auth().signOut()
+    async logoutUser ({commit}) {
+      await supabase.auth.signOut()
       // Send mutation null
       commit('setUser', null)
     },
-    // Сохранение email пользователя в firebase, если ранее не был сохранен
+    // Сохранение email пользователя в Supabase, если ранее не был сохранен
     async persistEmail ({commit, getters}) {
       commit('clearError')
       commit('setLoading', true)
       try {
         console.log('getters.user', getters.user)
         if (getters.user) {
-          const emailResponse =
-            await firebase.database()
-              .ref(getters.user.id + '/userdata/email')
-              .once('value')
-          // Get value
-          const email = emailResponse.val()
-          // Если email не существует в firebase
-          if (!email) {
-            // создаем ветвь в firebase в структуре данных текущего пользователя
-            await firebase.database().ref(getters.user.id).child('userdata').child('email').push({'email': 'empty'})
-            // и заносим туде значение email
-            await firebase.database().ref(getters.user.id).child('userdata').child('email').set(getters.user.email)
+          // Check if userdata exists
+          const { data: userdata, error: fetchError } = await supabase
+            .from('userdata')
+            .select('email')
+            .eq('id', getters.user.id)
+            .single()
+          
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError
+          }
+          
+          // Если email не существует в Supabase
+          if (!userdata || !userdata.email) {
+            // создаем или обновляем запись в Supabase
+            const { error: upsertError } = await supabase
+              .from('userdata')
+              .upsert({
+                id: getters.user.id,
+                email: getters.user.email
+              })
+            
+            if (upsertError) throw upsertError
           }
         }
         commit('setLoading', false)

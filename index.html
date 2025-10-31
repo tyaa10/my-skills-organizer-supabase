@@ -3,26 +3,12 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>skills-organizer</title>
-    <link rel="manifest" href="<%= htmlWebpackPlugin.files.publicPath %>static/manifest.json">
+    <title><%- title %></title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/favicon.ico">
   </head>
   <body>
     <div id="app"></div>
-    <!-- <div class="sidebar-open-button">
-      <div class="button-burger"><span class="line line-1"></span><span class="line line-2"></span><span class="line line-3"></span></div>
-    </div>
-  
-    <div class="sidebar">
-      <div class="container">
-        <div class="sidebar-content">
-          <p class="ui-text-small" style="margin:16px 0 6px 0;">Basic:</p>
-          <ul class="sidebar-list">
-            <li class="sidebar-item"><a class="sidebar-link" href="#">Example link</a></li>
-            <li class="sidebar-item"><a class="sidebar-link" href="#">Example second link</a></li>
-          </ul>
-        </div>
-      </div>
-    </div> -->
-    <!-- built files will be auto injected -->
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

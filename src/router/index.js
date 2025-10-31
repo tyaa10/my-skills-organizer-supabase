@@ -1,41 +1,40 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import Home from '@/components/Home'
-import Templates from '@/components/Templates'
-import SignIn from '@/components/Auth/SignIn'
-// import SignInSuccess from '@/components/Auth/SignInSuccess'
-import SignUp from '@/components/Auth/SignUp'
-import About from '@/components/About'
+import Home from '@/components/Home.vue'
+import Templates from '@/components/Templates.vue'
+import SignIn from '@/components/Auth/SignIn.vue'
+import SignUp from '@/components/Auth/SignUp.vue'
+import About from '@/components/About.vue'
+import store from '@/store'
 
 Vue.use(Router)
 
-export default new Router({
+const router = new Router({
   mode: 'history',
   routes: [
     {
       path: '/',
       name: 'home',
-      component: Home
+      component: Home,
+      meta: { requiresAuth: true }
     },
     {
       path: '/templates',
       name: 'templates',
-      component: Templates
+      component: Templates,
+      meta: { requiresAuth: true }
     },
-    /* {
-      path: '/signin-success',
-      name: 'signin-success',
-      component: SignInSuccess
-    }, */
     {
       path: '/signin',
       name: 'signin',
-      component: SignIn
+      component: SignIn,
+      meta: { requiresGuest: true }
     },
     {
       path: '/signup',
       name: 'signup',
-      component: SignUp
+      component: SignUp,
+      meta: { requiresGuest: true }
     },
     {
       path: '/about',
@@ -44,3 +43,30 @@ export default new Router({
     }
   ]
 })
+
+// Навигационный гард
+router.beforeEach(async (to, from, next) => {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
+  
+  // Инициализируем пользователя из сессии если нужно
+  /* if (!store.getters.checkUser && requiresAuth) {
+    try {
+      await store.dispatch('initializeUserFromSession')
+    } catch (error) {
+      console.error('Error initializing user:', error)
+    }
+  } */
+  
+  const isAuthenticated = store.getters.checkUser
+  
+  if (requiresAuth && !isAuthenticated) {
+    next('/signin')
+  } else if (requiresGuest && isAuthenticated) {
+    next('/')
+  } else {
+    next()
+  }
+})
+
+export default router

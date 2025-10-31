@@ -35,12 +35,12 @@
                     @click="setLocale('en')"
                     :class="{ 'active-lang': this.$i18n.locale === 'en' }"
                   )
-                    flag(:iso="'gb'")
+                    img(src="/flags/en.png" width="20" height="15" alt="English")
                   span.lang-icon(
                     @click="setLocale('ru')"
-                    :class="{ 'active-lang': this.$i18n.locale === 'ru' }"
+                    :class="{ 'active-lang': this.$i18n.locale === 'ru' }"  
                   )
-                    flag(:iso="'ru'")
+                    img(src="/flags/ru.png" width="20" height="15" alt="Русский")
                 // Статическое формирование пункта меню "Выйти"
                 li.navbar-item(
                   v-if="checkUser"
@@ -48,7 +48,7 @@
                 )
                   span.navbar-link {{$t('app.signout')}} ({{userData.name}})
                     img(:src="userData.photo" style="height: 32px; width: 32px; border-radius: 50%")
-    // Место для отображения компонента, соответствующего текущему роуту
+    // Место для отображения компонента, соответствующего текущему маршруту
     router-view
     // Анимированная заставка для отображения во время выполнения операций с данными
     .cssload-loader(v-show="isLoading")
@@ -58,7 +58,6 @@
 </template>
 
 <script>
-import firebase from 'firebase'
 import store from './store'
 export default {
   data () {
@@ -66,21 +65,9 @@ export default {
       menuShow: false
     }
   },
-  props: ['firebaseMessagingTokenKey', 'lastUser'],
+  props: ['lastUser'],
   created () {
-    // Обработчик событий "пользователь вошел / вышел"
-    firebase.auth().onAuthStateChanged(function (user) {
-      if (user) {
-        store.dispatch('loggedUser', user).then(() => {
-          // Сохраняем email пользователя в firebase, если его там еще нет
-          store.dispatch('persistEmail')
-        })
-        store.dispatch('loadLocale', user)
-        store.dispatch('loadNodes', user)
-        store.dispatch('loadDeps', user)
-        store.dispatch('loadTemplates', user)
-      } else {}
-    })
+    // Auth state is now handled in main.js with Supabase
   },
   computed: {
     checkUser () {
@@ -113,20 +100,27 @@ export default {
         this.$router.push('/signin')
       }
       // Иначе переадресуем на желаемый раздел сайта
+    },
+    isLoading(newVal, oldVal) {
+      console.log('👀 App isLoading changed:', oldVal, '->', newVal)
+      if (newVal === true) {
+        // Запускаем таймер для обнаружения зависаний
+        setTimeout(() => {
+          if (this.isLoading === true) {
+            console.warn('⚠️ Loading state stuck for too long!')
+            console.log('📊 Current state:', {
+              route: this.$route.path,
+              user: this.checkUser,
+              loadingStack: this.$store.getters.loadingStack
+            })
+          }
+        }, 5000)
+      }
     }
   },
   methods: {
     signOut () {
-      // Получение хендлера firebase
-      const FIREBASE_DATABASE = firebase.database()
-      // Если в локальном хранилище есть токен получения уведомлений
-      if (store.getters.firebaseMessagingTokenKey) {
-        // - удаляем его из firebase
-        FIREBASE_DATABASE.ref(store.getters.user.id + '/tokens').child(store.getters.firebaseMessagingTokenKey).remove()
-      }
-      // Устанавливаем поле токена получения уведомлений в локальном хранилище в null
-      store.dispatch('setTokenKey', null)
-      // Вызываем выход из учетной записи в текущем приложении
+      // Call logout from store (now uses Supabase)
       store.dispatch('logoutUser')
     },
     setLocale (locale) {

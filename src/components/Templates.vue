@@ -93,6 +93,9 @@
         .button.button-light.ui-messageBox-cancel {{formStaticContent.buttons.cancel}}
         .button.button-primary.ui-messageBox-ok(v-if="tempFormMode == 'create' || tempFormMode == 'edit'") {{formStaticContent.buttons.ok}}
         .button.button-primary.ui-messageBox-ok(v-else-if="tempFormMode == 'import'") {{formStaticContent.buttons.ok}}
+      #errorMessage.ui-message.ui-message--danger
+        span.message-title {{$t('templates.messages.error')}}
+        span(v-if="errorMessage") : {{ errorMessage }}
 </template>
 <script>
 import { showRightSidebar, hideRightSidebar, uiMessage, showMessage } from '@/assets/js/uimini.js'
@@ -158,13 +161,19 @@ export default {
   computed: {
     temps () {
       // источник данных о шаблонах
-      return this.$store.getters.temps
+      const templates = this.$store.getters.temps
+      console.log('📋 Templates in store:', templates)
+      return templates
     },
     currentUserId () {
-      return this.$store.getters.user ? this.$store.getters.user.id : null
+      const userId = this.$store.getters.user ? this.$store.getters.user.id : null
+      console.log('👤 Current user ID:', userId)
+      return userId
     },
     currentTemplateId () {
-      return this.$store.getters.currentTemplateId
+      const templateId = this.$store.getters.currentTemplateId
+      console.log('🎯 Current template ID:', templateId)
+      return templateId
     },
     checkTemplate () {
       // Проверка: есть ли выделенный шаблон в списке
@@ -197,6 +206,9 @@ export default {
           cancel: this.$t('templates.dialogs.buttons.cancel')
         }
       }
+    },
+    errorMessage() {
+      return this.$store.getters.error
     }
   },
   watch: {
@@ -307,15 +319,21 @@ export default {
     },
     tempDeleteDialogItOk () {
       // Вызываем в хранилище действие удаления выделенного Template
-      this.$store.dispatch('deleteTemplate')
+      this.$store.dispatch('deleteTemplate', this.currentTemplateId)
         .then(() => {
           this.tempDeleteDialogHandler = null
-          this.$store.dispatch('loadTemplateNodes')
+          this.$store.dispatch('loadTemplates') // Перезагружаем список
             .then(() => {
-              this.$store.dispatch('loadTemplateDeps')
+              this.$store.dispatch('loadTemplateNodes')
+                .then(() => {
+                  this.$store.dispatch('loadTemplateDeps')
+                })
             })
-          // this.$refs.fabricCanvasHandler.fabricReDraw()
           showMessage('#doneMessage')
+        })
+        .catch(error => {
+          console.error('❌ Delete failed:', error)
+          showMessage('#errorMessage')
         })
     },
     tempDeleteDialogItCancel () {
@@ -381,32 +399,59 @@ export default {
       showMessage('#cancelledMessage')
     },
     // Import OK
-    tempImportDialogItOk () {
+    async tempImportDialogItOk () {
       if (!this.$v.importTemplate.$invalid) {
-        // this.$refs.fabricCanvasHandler.fabricClearCanvas()
-        const [importUserId, importTemplateId] = this.importTemplate.id.split('@')
-        const store = this.$store
-        store.dispatch('setCurrentTemplateId', null)
-          .then(() => {
-            store.dispatch('loadTemplateNodes')
-              .then(() => {
-                store.dispatch('loadTemplateDeps')
-              })
+        try {
+          const importId = this.importTemplate.id.trim()
+          
+          if (!importId.includes('@')) {
+            showMessage('#errorMessage')
+            this.$store.commit('setError', 'Invalid template ID format. Use: userId@templateId')
+            return
+          }
+          
+          const [importUserId, importTemplateId] = importId.split('@')
+          
+          if (!importUserId || !importTemplateId) {
+            showMessage('#errorMessage')
+            this.$store.commit('setError', 'Invalid template ID format. Both user ID and template ID are required.')
+            return
+          }
+          
+          console.log('🔄 Starting template import:', { importUserId, importTemplateId })
+          
+          const store = this.$store
+          
+          // Импортируем шаблон
+          const result = await store.dispatch('importTemplate', {
+            importUserId,
+            importTemplateId
           })
-        store.dispatch('importTemplate', {
-          importUserId,
-          importTemplateId
-        })
-          .then(() => {
-            store.dispatch('loadTemplateNodes')
-              .then(() => {
-                store.dispatch('loadTemplateDeps')
-              })
-              .then(() => {
-                this.tempImportDialogHandler = null
-                showMessage('#doneMessage')
-              })
-          })
+          
+          if (result.success) {
+            // Перезагружаем список шаблонов
+            await store.dispatch('loadTemplates')
+            
+            // Устанавливаем импортированный шаблон как текущий
+            await store.dispatch('setCurrentTemplateId', result.templateId)
+            
+            // Загружаем узлы и зависимости
+            await store.dispatch('loadTemplateNodes')
+            await store.dispatch('loadTemplateDeps')
+            
+            // Обновляем форму
+            this.setTempForm()
+            
+            this.tempImportDialogHandler = null
+            this.importTemplate.id = ''
+            showMessage('#doneMessage')
+          }
+          
+        } catch (error) {
+          console.error('❌ Import failed:', error)
+          showMessage('#errorMessage')
+          this.$store.commit('setError', error.message)
+        }
       } else {
         showMessage('#cancelledMessage')
       }
@@ -433,16 +478,67 @@ export default {
         this.selectedTemplate = this.temps.find(temp => temp.id === this.currentTemplateId)
       }
     },
-    templatesItemClick (id) {
+    async templatesItemClick (id) {
       const store = this.$store
-      store.dispatch('setCurrentTemplateId', id)
-        .then(() => {
-          this.setTempForm()
-          store.dispatch('loadTemplateNodes')
-            .then(() => {
-              store.dispatch('loadTemplateDeps')
-            })
+      
+      // Если уже выбран этот шаблон, ничего не делаем
+      if (this.currentTemplateId === id) {
+        console.log('ℹ️ Template already selected:', id)
+        return
+      }
+      
+      console.log('🎯 Selecting template:', id)
+      
+      try {
+        // Сначала сбрасываем текущий шаблон
+        await store.dispatch('setCurrentTemplateId', null)
+        
+        // Очищаем текущие данные
+        store.commit('loadNodes', { target: 'templateElems', nodes: [] })
+        store.commit('loadDeps', { target: 'templateDeps', deps: [] })
+        
+        // Устанавливаем новый шаблон
+        await store.dispatch('setCurrentTemplateId', id)
+        this.setTempForm()
+        
+        // Загружаем данные шаблона с таймаутом
+        const loadPromise = Promise.all([
+          store.dispatch('loadTemplateNodes'),
+          store.dispatch('loadTemplateDeps')
+        ])
+        
+        // Добавляем таймаут для предотвращения бесконечной загрузки
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Template loading timeout')), 10000) // 10 секунд
         })
+        
+        await Promise.race([loadPromise, timeoutPromise])
+        
+        // Проверяем, что данные загружены
+        const nodes = store.getters.templateElems
+        const deps = store.getters.templateDeps
+        console.log('📊 Loaded data:', {
+          nodesCount: nodes.length,
+          depsCount: deps.length
+        })
+        
+      } catch (error) {
+        console.error('❌ Error loading template data:', error)
+        
+        // Сбрасываем состояние при ошибке
+        await store.dispatch('setCurrentTemplateId', null)
+        store.commit('loadNodes', { target: 'templateElems', nodes: [] })
+        store.commit('loadDeps', { target: 'templateDeps', deps: [] })
+        
+        showMessage('#errorMessage')
+        
+        // Перезагружаем список шаблонов
+        try {
+          await store.dispatch('loadTemplates')
+        } catch (reloadError) {
+          console.error('❌ Error reloading templates:', reloadError)
+        }
+      }
     },
     copyDeps () {
       this.$store.getters.templateDeps.forEach((d, i, array) => {

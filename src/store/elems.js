@@ -1,5 +1,4 @@
-import firebase from 'firebase/app'
-
+import {supabase} from '../helpers/supabaseConfig'
 import Node from './NodeModel'
 
 export default ({
@@ -74,7 +73,14 @@ export default ({
       state.lastCreatedTemplateElemId = id
     },
     loadNodes (state, payload) {
+      console.log('🔄 Mutation: loadNodes', payload.target, 'nodes count:', payload.nodes.length)
       state[payload.target] = payload.nodes
+      // Сбрасываем ID последнего созданного элемента
+      if (payload.target === 'templateElems') {
+        state.lastCreatedTemplateElemId = null
+      } else {
+        state.lastCreatedElemId = null
+      }
     },
     editNode (state, payload) {
       const oldElem = state[payload.target].find(elem => elem.id === payload.id)
@@ -102,13 +108,6 @@ export default ({
   },
   actions: {
     /* Create new Node */
-    // Local
-    /* addElem ({commit}, payload) {
-      payload.attrs.id = Math.random()
-      commit('addElem', payload)
-
-    }, */
-    // With BackEnd
     async newNode ({commit, getters}, payload) {
       commit('clearError')
       commit('setLoading', true)
@@ -124,28 +123,45 @@ export default ({
           payload.dependenciesSatisfied,
           payload.radius,
           payload.left,
-          payload.top// ,
-          // getters.user.id
+          payload.top
         )
         const nowDateISOString = (new Date()).toISOString()
-        const node = await firebase.database().ref(getters.user.id + '/nodes').push({...newNode, createdAt: nowDateISOString})
-        // const node = await firebase.database().ref(getters.user.id + '/nodes').push(newNode)
-        const nodesUpdatedAtResponse =
-          await firebase.database()
-            .ref(getters.user.id + '/userdata/nodeSetUpdatedAt')
-            .once('value')
-        const nodesUpdatedAt = nodesUpdatedAtResponse.val()
-        // Если nodesUpdatedAt не существует в firebase
-        if (!nodesUpdatedAt) {
-          // создаем ветвь в firebase в структуре данных текущего пользователя
-          await firebase.database().ref(getters.user.id).child('userdata').child('nodesUpdatedAt').push({'nodesUpdatedAt': 'empty'})
-        }
-        // и заносим туда значение nodesUpdatedAt
-        await firebase.database().ref(getters.user.id).child('userdata').child('nodesUpdatedAt').set(nowDateISOString)
+        
+        // Insert new node into Supabase
+        const { data: node, error: nodeError } = await supabase
+          .from('nodes')
+          .insert({
+            user_id: getters.user.id,
+            title: newNode.title,
+            type: newNode.type,
+            description: newNode.description,
+            access: newNode.access,
+            status: newNode.status,
+            dependencies_satisfied: newNode.dependenciesSatisfied,
+            radius: newNode.radius,
+            top: newNode.top,
+            left_pos: newNode.left,
+            created_at: nowDateISOString
+          })
+          .select()
+          .single()
+        
+        if (nodeError) throw nodeError
+        
+        // Update userdata with nodesUpdatedAt
+        const { error: userdataError } = await supabase
+          .from('userdata')
+          .upsert({
+            id: getters.user.id,
+            nodes_updated_at: nowDateISOString
+          })
+        
+        if (userdataError) throw userdataError
+        
         // Send mutation
         commit('newNode', {
           ...newNode,
-          id: node.key
+          id: node.id
         })
 
         commit('setLoading', false)
@@ -155,6 +171,7 @@ export default ({
         throw error
       }
     },
+    
     async newTemplateNode ({commit, getters}, payload) {
       commit('clearError')
       commit('setLoading', true)
@@ -169,15 +186,33 @@ export default ({
           payload.dependenciesSatisfied,
           payload.radius,
           payload.left,
-          payload.top// ,
-          // getters.user.id
+          payload.top
         )
-        const node = await firebase.database().ref(getters.user.id + '/templates/' + getters.currentTemplateId + '/nodes').push(newNode)
+        
+        const { data: node, error } = await supabase
+          .from('template_nodes')
+          .insert({
+            template_id: payload.templateId || getters.currentTemplateId,
+            title: newNode.title,
+            type: newNode.type,
+            description: newNode.description,
+            access: newNode.access,
+            status: newNode.status,
+            dependencies_satisfied: newNode.dependenciesSatisfied,
+            radius: newNode.radius,
+            top: newNode.top,
+            left_pos: newNode.left
+          })
+          .select()
+          .single()
+        
+        if (error) throw error
+        
         // Send mutation
         commit('newTemplateNode', {
           ...newNode,
-          // templateId: payload.templateId,
-          id: node.key
+          templateId: payload.templateId || getters.currentTemplateId,
+          id: node.id
         })
 
         commit('setLoading', false)
@@ -187,39 +222,36 @@ export default ({
         throw error
       }
     },
+    
     async loadNodes ({commit, getters}) {
       commit('clearError')
       commit('setLoading', true)
       try {
-        const nodesResponse =
-          await firebase.database()
-            .ref(getters.user.id + '/nodes')
-            // .orderByChild('user')
-            // .equalTo(getters.user.id)
-            .once('value')
-        // Get value
-        const nodes = nodesResponse.val()
-        // console.log(nodes)
-        if (nodes != null) {
+        const { data: nodes, error } = await supabase
+          .from('nodes')
+          .select('*')
+          .eq('user_id', getters.user.id)
+          .order('created_at', { ascending: false })
+        
+        if (error) throw error
+        
+        if (nodes && nodes.length > 0) {
           // New array
           const nodesArray = []
-          // Get task key (id)
-          Object.keys(nodes).forEach(key => {
-            const n = nodes[key]
-            // console.log(n)
+          // Convert to Node objects
+          nodes.forEach(node => {
             nodesArray.push(
               new Node(
-                n.title,
-                n.type,
-                n.description,
-                n.access,
-                n.status,
-                n.dependenciesSatisfied,
-                n.radius,
-                n.left,
-                n.top,
-                // n.user,
-                key
+                node.title,
+                node.type,
+                node.description,
+                node.access,
+                node.status,
+                node.dependencies_satisfied,
+                node.radius,
+                node.left_pos,
+                node.top,
+                node.id
               )
             )
           })
@@ -229,6 +261,9 @@ export default ({
           }
           // Send mutation
           commit('loadNodes', payload)
+        } else {
+          // Если узлов нет, очищаем state
+          commit('loadNodes', { target: 'elems', nodes: [] })
         }
 
         commit('setLoading', false)
@@ -238,42 +273,56 @@ export default ({
         throw error
       }
     },
+    
     async loadTemplateNodes ({commit, getters}) {
       commit('clearError')
       commit('setLoading', true)
       try {
         const currentTemplateId = getters.currentTemplateId
-        const nodesResponse =
-          await firebase.database()
-            .ref(getters.user.id + '/templates/' + currentTemplateId + '/nodes')
-            // .orderByChild('user')
-            // .equalTo(getters.user.id)
-            .once('value')
-        // Get value
-        const nodes = nodesResponse.val()
+        console.log('🔄 Loading template nodes for template:', currentTemplateId)
+        
+        if (!currentTemplateId) {
+          console.log('ℹ️ No template selected, clearing nodes')
+          commit('loadNodes', { target: 'templateElems', nodes: [] })
+          commit('setLoading', false)
+          return
+        }
+        
+        const { data: nodes, error } = await supabase
+          .from('template_nodes')
+          .select('*')
+          .eq('template_id', currentTemplateId)
+          .order('created_at', { ascending: false })
+        
+        if (error) {
+          console.error('❌ Error loading template nodes:', error)
+          throw error
+        }
+        
+        console.log('📋 Template nodes loaded:', nodes?.length || 0)
+        
         // New array
         const nodesArray = []
-        if (nodes != null) {
-          // Get task key (id)
-          Object.keys(nodes).forEach(key => {
-            const n = nodes[key]
+        if (nodes && nodes.length > 0) {
+          // Convert to Node objects
+          nodes.forEach(node => {
             nodesArray.push(
               new Node(
-                n.title,
-                n.type,
-                n.description,
-                n.access,
-                n.status,
-                n.dependenciesSatisfied,
-                n.radius,
-                n.left,
-                n.top,
-                // n.user,
-                key
+                node.title,
+                node.type,
+                node.description,
+                node.access,
+                node.status,
+                node.dependencies_satisfied,
+                node.radius,
+                node.left_pos,
+                node.top,
+                node.id
               )
             )
           })
         }
+        
         const payload = {
           target: 'templateElems',
           nodes: nodesArray
@@ -282,19 +331,37 @@ export default ({
         commit('loadNodes', payload)
         commit('setLoading', false)
       } catch (error) {
+        console.error('❌ Error in loadTemplateNodes:', error)
         commit('setLoading', false)
         commit('setError', error.message)
         throw error
       }
     },
+    
     async editNode ({commit, getters}, {id, changes}) {
       commit('clearError')
       commit('setLoading', true)
       try {
-        // Update data fields
-        await firebase.database().ref(getters.user.id + '/nodes').child(id).update({
-          ...changes
-        })
+        // Update data fields in Supabase
+        const updateData = {}
+        if (changes.title !== undefined) updateData.title = changes.title
+        if (changes.type !== undefined) updateData.type = changes.type
+        if (changes.description !== undefined) updateData.description = changes.description
+        if (changes.access !== undefined) updateData.access = changes.access
+        if (changes.status !== undefined) updateData.status = changes.status
+        if (changes.dependenciesSatisfied !== undefined) updateData.dependencies_satisfied = changes.dependenciesSatisfied
+        if (changes.radius !== undefined) updateData.radius = changes.radius
+        if (changes.left !== undefined) updateData.left_pos = changes.left
+        if (changes.top !== undefined) updateData.top = changes.top
+        
+        const { error } = await supabase
+          .from('nodes')
+          .update(updateData)
+          .eq('id', id)
+          .eq('user_id', getters.user.id)
+        
+        if (error) throw error
+        
         // Send mutation
         commit('editNode', {id, target: 'elems', ...changes})
 
@@ -305,15 +372,30 @@ export default ({
         throw error
       }
     },
+    
     async editTemplateNode ({commit, getters}, {id, changes}) {
       commit('clearError')
       commit('setLoading', true)
       try {
-        // Update data fields
-        const currentTemplateId = getters.currentTemplateId
-        await firebase.database().ref(getters.user.id + '/templates/' + currentTemplateId + '/nodes').child(id).update({
-          ...changes
-        })
+        // Update data fields in Supabase
+        const updateData = {}
+        if (changes.title !== undefined) updateData.title = changes.title
+        if (changes.type !== undefined) updateData.type = changes.type
+        if (changes.description !== undefined) updateData.description = changes.description
+        if (changes.access !== undefined) updateData.access = changes.access
+        if (changes.status !== undefined) updateData.status = changes.status
+        if (changes.dependenciesSatisfied !== undefined) updateData.dependencies_satisfied = changes.dependenciesSatisfied
+        if (changes.radius !== undefined) updateData.radius = changes.radius
+        if (changes.left !== undefined) updateData.left_pos = changes.left
+        if (changes.top !== undefined) updateData.top = changes.top
+        
+        const { error } = await supabase
+          .from('template_nodes')
+          .update(updateData)
+          .eq('id', id)
+        
+        if (error) throw error
+        
         // Send mutation
         commit('editNode', {id, target: 'templateElems', ...changes})
 
@@ -324,28 +406,54 @@ export default ({
         throw error
       }
     },
+    
     async deleteNode ({commit, getters}, id) {
       commit('clearError')
       commit('setLoading', true)
       try {
-        await firebase.database().ref(getters.user.id + '/nodes').child(id).remove()
+        console.log('🗑️ Deleting node with CASCADE:', id)
+        
+        // Теперь можно удалить просто узел - зависимости удалятся автоматически
+        const { error } = await supabase
+          .from('nodes')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', getters.user.id)
+        
+        if (error) throw error
+        
         commit('deleteNode', {id, target: 'elems'})
         commit('setLoading', false)
+        console.log('✅ Node deleted successfully with CASCADE')
+        
       } catch (error) {
+        console.error('❌ Error deleting node:', error)
         commit('setLoading', false)
         commit('setError', error.message)
         throw error
       }
     },
+    
     async deleteTemplateNode ({commit, getters}, id) {
       commit('clearError')
       commit('setLoading', true)
       try {
-        const currentTemplateId = getters.currentTemplateId
-        await firebase.database().ref(getters.user.id + '/templates/' + currentTemplateId + '/nodes').child(id).remove()
+        console.log('🗑️ Deleting template node with CASCADE:', id)
+        
+        // Теперь можно удалить просто узел - зависимости удалятся автоматически
+        const { error } = await supabase
+          .from('template_nodes')
+          .delete()
+          .eq('id', id)
+        
+        if (error) throw error
+        
         commit('deleteNode', {id, target: 'templateElems'})
         commit('setLoading', false)
+        console.log('✅ Template node deleted successfully with CASCADE')
+        
       } catch (error) {
+        console.error('❌ Error in deleteTemplateNode:', error)
         commit('setLoading', false)
         commit('setError', error.message)
         throw error

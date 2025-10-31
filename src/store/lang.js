@@ -1,4 +1,4 @@
-import firebase from 'firebase/app'
+import { supabase } from '../helpers/supabaseConfig'
 import { i18n } from '../plugins/i18n'
 import Cookie from 'js-cookie'
 
@@ -22,20 +22,15 @@ export default {
       commit('setLoading', true)
       try {
         if (getters.user) {
-          const localeResponse =
-            await firebase.database()
-              .ref(getters.user.id + '/locale')
-              .once('value')
-          // Get value
-          const locale = localeResponse.val()
-          if (locale != null) {
-            await firebase.database()
-              .ref(getters.user.id + '/locale')
-              .child(Object.keys(locale)[0])
-              .update({payload})
-          } else {
-            await firebase.database().ref(getters.user.id + '/locale').push({payload})
-          }
+          // Update user locale in Supabase
+          const { error } = await supabase
+            .from('userdata')
+            .upsert({
+              id: getters.user.id,
+              locale: payload
+            })
+          
+          if (error) throw error
         } else {
           Cookie.set('locale', payload)
         }
@@ -52,34 +47,38 @@ export default {
       commit('setLoading', true)
       try {
         // пытаемся получить локаль из удаленного хранилища
-        const localeResponse =
-          await firebase.database()
-            .ref(getters.user.id + '/locale')
-            .once('value')
-        // Get value
-        const locale = localeResponse.val()
+        const { data: userdata, error } = await supabase
+          .from('userdata')
+          .select('locale')
+          .eq('id', getters.user.id)
+          .single()
+        
+        if (error && error.code !== 'PGRST116') {
+          throw error
+        }
+        
         // пытаемся достать локаль из куки
         const cookiesLocale = Cookie.get('locale')
         if (cookiesLocale) {
-          // Если в куки была локаль и в удаленном хранилище - тоже
-          if (locale != null) {
-            // обновляем ее в удаленном хранилище ...
-            await firebase.database()
-              .ref(getters.user.id + '/locale')
-              .child(Object.keys(locale)[0])
-              .update({payload: cookiesLocale})
+          // Если в куки была локаль, обновляем ее в Supabase
+          if (userdata) {
+            await supabase
+              .from('userdata')
+              .update({ locale: cookiesLocale })
+              .eq('id', getters.user.id)
           } else {
-            // Иначе - отправляем ее в удаленное хранилище впервые ...
-            await firebase.database().ref(getters.user.id + '/locale').push({payload: cookiesLocale})
+            await supabase
+              .from('userdata')
+              .insert({ id: getters.user.id, locale: cookiesLocale })
           }
           // ... и устанавливаем ее текущей локально
           commit('setLocale', cookiesLocale)
           // Удаляем локаль из куки
           Cookie.remove('locale')
-        } else if (locale != null) {
+        } else if (userdata && userdata.locale) {
           // Иначе - если пришла локаль из удаленного хранилища -
           // Устанавливаем ее текущей
-          commit('setLocale', Object.values(locale)[0].payload)
+          commit('setLocale', userdata.locale)
         }
         commit('setLoading', false)
       } catch (error) {

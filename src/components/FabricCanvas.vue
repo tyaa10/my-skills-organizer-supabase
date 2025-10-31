@@ -120,7 +120,7 @@ import { fabric } from 'fabric'
 import { VueContext } from 'vue-context'
 import { uiMessage, showMessage, showSidebar, hideSidebar } from '@/assets/js/uimini.js'
 import { required, minLength, maxLength } from 'vuelidate/lib/validators'
-import '../assets/css/main.css'
+import '@/assets/css/main.css'
 
 export default {
   name: 'FabricCanvas',
@@ -751,7 +751,7 @@ export default {
       }
       )
       // Удаляем из хранилища все "потерянные" зависимости
-      lostLinesIds.forEach(lostLineId => {
+      /* lostLinesIds.forEach(lostLineId => {
         // TODO
         this.$store.dispatch(this.actionNames.deleteDep, lostLineId)
           .then(() => {
@@ -760,7 +760,11 @@ export default {
       })
       lostLinesSourceNodes.forEach(lostLineSourceNode => {
         this.recomputeNodeDeps(lostLineSourceNode)
-      })
+      }) */
+      if (lostLinesIds.length > 0) {
+        console.warn('⚠️ Found dependencies with missing nodes:', lostLinesIds)
+        console.log('This can happen during template loading. Dependencies will be preserved.')
+      }
     },
     // Метод перерисовки изображения зависимости
     // при перетаскивании узлов, которые она связывает
