@@ -343,7 +343,7 @@ export default {
     },
     tempUseDialogItOk () {
       // Copy Nodes
-      let maxNodeTop = this.$store.getters.elems[0].top
+      let maxNodeTop = this.$store.getters.elems[0]?.top ?? 100
       this.$store.getters.elems.forEach(n => {
         if (n.top > maxNodeTop) {
           maxNodeTop = n.top
