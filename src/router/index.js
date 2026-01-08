@@ -5,6 +5,7 @@ import Templates from '@/components/Templates.vue'
 import SignIn from '@/components/Auth/SignIn.vue'
 import SignUp from '@/components/Auth/SignUp.vue'
 import About from '@/components/About.vue'
+import AuthCallback from '@/components/Auth/AuthCallback.vue'
 import store from '@/store'
 
 Vue.use(Router)
@@ -40,6 +41,11 @@ const router = new Router({
       path: '/about',
       name: 'about',
       component: About
+    },
+    {
+      path: '/auth/callback',
+      name: 'AuthCallback',
+      component: AuthCallback
     }
   ]
 })

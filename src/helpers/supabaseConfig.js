@@ -7,7 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false, // Отключаем обнаружение в URL
+    detectSessionInUrl: true,
     storage: window.localStorage,
     flowType: 'pkce',
     // Увеличиваем время жизни сессии
@@ -17,9 +17,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     cookieOptions: {
       name: 'sb-auth-token',
       lifetime: 365 * 24 * 60 * 60, // 1 год в секундах
-      domain: '',
+      domain: '.vercel.app',
       path: '/',
-      sameSite: 'lax'
+      sameSite: 'lax',
+      secure: true
     }
   },
   global: {
