@@ -2,7 +2,7 @@
   // Кнопка просмотра обучающего видео
   button.button--big.button.button-default.button-video-tutorial(@click.prevent="showVideoTutorial")
     font-awesome-icon(:icon="'play'")
-    span {{$t('video-tutorial-button.inner-text')}}
+    span {{buttonText}}
 </template>
 
 <script>
@@ -11,7 +11,7 @@ export default {
   data () {
     return {}
   },
-  props: ['url'],
+  props: ['url', 'buttonText'],
   methods: {
     showVideoTutorial () {
       window.open(this.url)

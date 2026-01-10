@@ -13,19 +13,19 @@
           #supabase-auth-container
             .auth-form
               .form-group
-                label Email
-                input.form-control(v-model="email" type="email" placeholder="Enter your email")
+                label {{$t('signin.email_input.label')}}
+                input.form-control(v-model="email" type="email" :placeholder="$t('signin.email_input.placeholder')")
               .form-group
-                label Password
-                input.form-control(v-model="password" type="password" placeholder="Enter your password")
+                label {{$t('signin.password_input.label')}}
+                input.form-control(v-model="password" type="password" :placeholder="$t('signin.password_input.placeholder')")
               .form-group
-                button.btn.btn-primary(@click="signIn" :disabled="loading") {{ loading ? 'Signing in...' : 'Sign In' }}
-                button.btn.btn-secondary(@click="signUp" :disabled="loading") {{ loading ? 'Signing up...' : 'Sign Up' }}
+                button.btn.btn-primary(@click="signIn" :disabled="loading") {{ loading ? $t('signin.signin_button.loading') : $t('signin.signin_button.default') }}
+                button.btn.btn-secondary(@click="signUp" :disabled="loading") {{ loading ? $t('signin.signup_button.loading') : $t('signin.signup_button.default') }}
               .form-group
-                button.btn.btn-google(@click="signInWithGoogle" :disabled="loading") Sign in with Google
+                button.btn.btn-google(@click="signInWithGoogle" :disabled="loading") {{$t('signin.signInWithGoogle_button')}}
               .error-message(v-if="error") {{ error }}
           // Кнопка просмотра обучающего видео
-          VideoTutorialButton(:url="$t('video-tutorial-button.url')")
+          VideoTutorialButton(:url="$t('video-tutorial-button.url')" :buttonText="$t('video-tutorial-button.inner-text')")
           v-tour(name='signin' :steps='steps' :callbacks="signinTourCallbacks")
             template(slot-scope='tour')
               transition(name='fade')

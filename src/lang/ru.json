@@ -167,6 +167,23 @@
     "signin": "Войти",
     "header": "Визуализируйте свои цели и достижения",
     "description": "MySkillsOrganizer предназначен для управления своими достижениями и творческими задачами. Добавьте узлы целей и зависимости между ними, поделитесь картой своего саморазвития со всем миром!",
+    "email_input": {
+      "label": "Почта",
+      "placeholder": "Введите Ваш email"
+    },
+    "password_input": {
+      "label": "Пароль",
+      "placeholder": "Введите Ваш пароль"
+    },
+    "signin_button": {
+      "default": "Войти",
+      "loading": "Вход..."
+    },
+    "signup_button": {
+      "default": "Зарегистрироваться",
+      "loading": "Регистрация..."
+    },
+    "signInWithGoogle_button": "Войти через Google",
     "vtour": {
       "signinGoogle": "Войдите в учетную запись Google"
     }

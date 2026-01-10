@@ -167,6 +167,23 @@
     "signin": "Signin",
     "header": "Visualize Your Aims and Achievements",
     "description": "MySkillsOrganizer is designed to manage your achievements and creative tasks. Add target nodes and dependencies between them, share the map of your self-development with the whole world!",
+    "email_input": {
+      "label": "Email",
+      "placeholder": "Enter your email"
+    },
+    "password_input": {
+      "label": "Password",
+      "placeholder": "Enter your password"
+    },
+    "signin_button": {
+      "default": "Sign In",
+      "loading": "Signing in..."
+    },
+    "signup_button": {
+      "default": "Sign Up",
+      "loading": "Signing up..."
+    },
+    "signInWithGoogle_button": "Sign in with Google",
     "vtour": {
       "signinGoogle": "Sign in to your Google Account"
     }
