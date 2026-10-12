@@ -102,7 +102,8 @@
     },
     "action_icons": {
       "add": "создать",
-      "import": "импорт",
+      "import": "импорт по ID",
+      "import_file": "импорт из файла",
       "edit": "редактировать",
       "delete": "удалить",
       "use": "использовать"
@@ -134,7 +135,7 @@
       },
       "import": {
         "title": "Импорт",
-        "description": "Ипорт шаблона по глобальному id",
+        "description": "Импорт шаблона по глобальному id",
         "id_input": {
           "label": "Id:",
           "placeholder": "Id импортируемого шаблона",
@@ -160,6 +161,31 @@
       "buttons": {
         "ok": "OK",
         "cancel": "Отмена"
+      },
+      "importFile": {
+        "title": "Импорт из файла",
+        "description": "Загрузите JSON-файл с описанием шаблона",
+        "file_input": {
+          "label": "Выберите JSON-файл"
+        },
+        "file_selected": "Выбран файл",
+        "errors": {
+          "no_file": "Пожалуйста, выберите файл",
+          "invalid_extension": "Файл должен иметь расширение .json",
+          "file_too_large": "Файл слишком большой. Максимальный размер — 5 МБ",
+          "read_error": "Ошибка чтения файла",
+          "parse_error": "Ошибка парсинга JSON. Проверьте формат файла.",
+          "missing_title": "Отсутствует поле \"title\"",
+          "missing_description": "Отсутствует поле \"description\"",
+          "missing_nodes": "Отсутствует или пуст массив \"nodes\"",
+          "invalid_node_id": "Узел должен иметь строковое поле \"id\"",
+          "missing_node_title": "У узла отсутствует поле \"title\"",
+          "duplicate_node_id": "Дублирующийся id узла",
+          "invalid_dependencies": "Поле \"dependencies\" должно быть массивом",
+          "invalid_dependency": "Зависимость должна иметь поля \"from\" и \"to\"",
+          "unknown_from_node": "Зависимость ссылается на неизвестный id узла (from)",
+          "unknown_to_node": "Зависимость ссылается на неизвестный id узла (to)"
+        }
       }
     }
   },

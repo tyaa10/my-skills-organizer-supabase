@@ -89,7 +89,7 @@
       "select_parent_node": "Select parent node"
     }
   },
-  "templates": {
+    "templates": {
     "templates": "Templates",
     "header": {
       "template": "Template",
@@ -102,7 +102,8 @@
     },
     "action_icons": {
       "add": "add",
-      "import": "import",
+      "import": "import by ID",
+      "import_file": "import from file",
       "edit": "edit",
       "delete": "delete",
       "use": "use"
@@ -160,6 +161,31 @@
       "buttons": {
         "ok": "OK",
         "cancel": "Cancel"
+      },
+      "importFile": {
+        "title": "Import from File",
+        "description": "Upload a JSON file containing the template definition",
+        "file_input": {
+          "label": "Select JSON file"
+        },
+        "file_selected": "Selected file",
+        "errors": {
+          "no_file": "Please select a file",
+          "invalid_extension": "File must have a .json extension",
+          "file_too_large": "File is too large. Maximum size is 5 MB",
+          "read_error": "Error reading the file",
+          "parse_error": "JSON parsing error. Please check the file format.",
+          "missing_title": "Missing \"title\" field",
+          "missing_description": "Missing \"description\" field",
+          "missing_nodes": "Missing or empty \"nodes\" array",
+          "invalid_node_id": "Node must have a string \"id\" field",
+          "missing_node_title": "Node is missing \"title\" field",
+          "duplicate_node_id": "Duplicate node id",
+          "invalid_dependencies": "\"dependencies\" must be an array",
+          "invalid_dependency": "Dependency must have \"from\" and \"to\" fields",
+          "unknown_from_node": "Dependency references unknown node id (from)",
+          "unknown_to_node": "Dependency references unknown node id (to)"
+        }
       }
     }
   },

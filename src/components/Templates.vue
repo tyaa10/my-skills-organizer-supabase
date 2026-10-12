@@ -29,6 +29,8 @@
         .button.button-default.templates-actions-button(@click='addTempClick' v-tooltip="$t('templates.action_icons.add')") +
         .button.button-default.templates-actions-button(@click='importTempClick' v-tooltip.top-center="$t('templates.action_icons.import')")
           font-awesome-icon(:icon="'file-import'")
+        .button.button-default.templates-actions-button(@click='importTempFileClick' v-tooltip.top-center="$t('templates.action_icons.import_file')")
+          font-awesome-icon(:icon="'file-arrow-up'")
         .button.button-default.templates-actions-button(v-if="checkTemplate" @click='editTempClick' v-tooltip.top-center="$t('templates.action_icons.edit')")
           font-awesome-icon(:icon="'edit'")
         .button.button-default.templates-actions-button(v-if="checkTemplate" @click='delTempClick' v-tooltip.top-center="$t('templates.action_icons.delete')")
@@ -89,10 +91,19 @@
             // Поле ввода глобального ИД импортируемого шаблона
             input.form__input#importTemplateIdInput(type='text' :placeholder="$t('templates.dialogs.import.id_input.placeholder')" v-model.trim="$v.importTemplate.id.$model")
           .error(v-if="!$v.importTemplate.id.required") {{$t('templates.dialogs.import.id_input.required_error')}}
+        // Форма импорта шаблона из JSON-файла
+        form(v-if="tempFormMode == 'importFile'" v-on:submit.prevent='')
+          .form-item
+            label.form__label(for='importTemplateFileInput') {{$t('templates.dialogs.importFile.file_input.label')}}
+            input.form__input#importTemplateFileInput(type='file' accept='.json' @change='handleFileSelect' ref='fileInput')
+          .error(v-if="fileError") {{ fileError }}
+          .ui-text-small(v-if="selectedFile && !fileError")
+            | {{$t('templates.dialogs.importFile.file_selected')}}: {{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
       .ui-messageBox__footer
         .button.button-light.ui-messageBox-cancel {{formStaticContent.buttons.cancel}}
         .button.button-primary.ui-messageBox-ok(v-if="tempFormMode == 'create' || tempFormMode == 'edit'") {{formStaticContent.buttons.ok}}
         .button.button-primary.ui-messageBox-ok(v-else-if="tempFormMode == 'import'") {{formStaticContent.buttons.ok}}
+        .button.button-primary.ui-messageBox-ok(v-else-if="tempFormMode == 'importFile'" @click="tempImportFileDialogItOk") {{formStaticContent.buttons.ok}}
       #errorMessage.ui-message.ui-message--danger
         span.message-title {{$t('templates.messages.error')}}
         span(v-if="errorMessage") : {{ errorMessage }}
@@ -129,13 +140,17 @@ export default {
       tempDeleteDialogHandler: null,
       tempUseDialogHandler: null,
       tempImportDialogHandler: null,
+      tempImportFileDialogHandler: null,
       tempFormMode: 'create',
       submitStatus: '',
       treeCopyingCompleted: false,
       templateNodesDictionary: null,
       importTemplate: {
         id: null
-      }
+      },
+      selectedFile: null,
+      fileError: null,
+      parsedTemplateData: null
     }
   },
   // Правила валидации
@@ -200,6 +215,10 @@ export default {
         import: {
           title: this.$t('templates.dialogs.import.title'),
           description: this.$t('templates.dialogs.import.description')
+        },
+        importFile: {
+          title: this.$t('templates.dialogs.importFile.title'),
+          description: this.$t('templates.dialogs.importFile.description')
         },
         buttons: {
           ok: this.$t('templates.dialogs.buttons.ok'),
@@ -563,6 +582,132 @@ export default {
             showMessage('#errorMessage')
           })
       })
+    },
+    importTempFileClick () {
+      this.tempFormMode = 'importFile'
+      this.fileError = null
+      this.selectedFile = null
+      this.parsedTemplateData = null
+      this.tempImportFileDialogHandler = uiMessage(this.tempImportFileDialogItOk, this.tempImportFileDialogItCancel, 'templatesModal')
+      this.tempImportFileDialogHandler.call()
+    },
+    tempImportFileDialogItOk () {
+      if (!this.parsedTemplateData) {
+        this.fileError = this.$t('templates.dialogs.importFile.errors.no_file')
+        return
+      }
+      this.$store.dispatch('importTemplateFromFile', this.parsedTemplateData)
+        .then((result) => {
+          if (result && result.success) {
+            this.$store.dispatch('loadTemplates').then(() => {
+              this.$store.dispatch('setCurrentTemplateId', result.templateId).then(() => {
+                this.$store.dispatch('loadTemplateNodes')
+                this.$store.dispatch('loadTemplateDeps')
+                this.setTempForm()                
+                this.tempImportFileDialogHandler = null
+                this.selectedFile = null
+                this.parsedTemplateData = null
+                this.fileError = null
+                showMessage('#doneMessage')
+              })
+            })
+          }
+        })
+        .catch(error => {
+          console.error('❌ File import failed:', error)
+          this.fileError = error.message || this.$t('templates.messages.error')
+          showMessage('#errorMessage')
+        })
+    },
+    tempImportFileDialogItCancel () {
+      this.tempImportFileDialogHandler = null
+      this.selectedFile = null
+      this.parsedTemplateData = null
+      this.fileError = null
+      showMessage('#cancelledMessage')
+    },
+    handleFileSelect (event) {
+      this.fileError = null
+      this.parsedTemplateData = null      
+      const file = event.target.files[0]
+      if (!file) {
+        this.selectedFile = null
+        return
+      }      
+      if (!file.name.toLowerCase().endsWith('.json')) {
+        this.fileError = this.$t('templates.dialogs.importFile.errors.invalid_extension')
+        this.selectedFile = null
+        return
+      }      
+      const maxSize = 5 * 1024 * 1024 // 5 MB
+      if (file.size > maxSize) {
+        this.fileError = this.$t('templates.dialogs.importFile.errors.file_too_large')
+        this.selectedFile = null
+        return
+      }      
+      this.selectedFile = file      
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result)
+          this.validateTemplateData(data)
+          this.parsedTemplateData = data
+        } catch (error) {
+          console.error('❌ Parse error:', error)
+          this.fileError = this.$t('templates.dialogs.importFile.errors.parse_error')
+          this.parsedTemplateData = null
+        }
+      }
+      reader.onerror = () => {
+        this.fileError = this.$t('templates.dialogs.importFile.errors.read_error')
+        this.parsedTemplateData = null
+      }
+      reader.readAsText(file)
+    },
+    validateTemplateData (data) {
+      if (!data.title || typeof data.title !== 'string') {
+        throw new Error(this.$t('templates.dialogs.importFile.errors.missing_title'))
+      }
+      if (!data.description || typeof data.description !== 'string') {
+        throw new Error(this.$t('templates.dialogs.importFile.errors.missing_description'))
+      }
+      if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+        throw new Error(this.$t('templates.dialogs.importFile.errors.missing_nodes'))
+      }      
+      const nodeIds = new Set()
+      for (const node of data.nodes) {
+        if (!node.id || typeof node.id !== 'string') {
+          throw new Error(this.$t('templates.dialogs.importFile.errors.invalid_node_id'))
+        }
+        if (!node.title || typeof node.title !== 'string') {
+          throw new Error(`${this.$t('templates.dialogs.importFile.errors.missing_node_title')}: "${node.id}"`)
+        }
+        if (nodeIds.has(node.id)) {
+          throw new Error(`${this.$t('templates.dialogs.importFile.errors.duplicate_node_id')}: "${node.id}"`)
+        }
+        nodeIds.add(node.id)
+      }      
+      if (data.dependencies) {
+        if (!Array.isArray(data.dependencies)) {
+          throw new Error(this.$t('templates.dialogs.importFile.errors.invalid_dependencies'))
+        }
+        for (const dep of data.dependencies) {
+          if (!dep.from || !dep.to) {
+            throw new Error(`${this.$t('templates.dialogs.importFile.errors.invalid_dependency')}: ${JSON.stringify(dep)}`)
+          }
+          if (!nodeIds.has(dep.from)) {
+            throw new Error(`${this.$t('templates.dialogs.importFile.errors.unknown_from_node')}: "${dep.from}"`)
+          }
+          if (!nodeIds.has(dep.to)) {
+            throw new Error(`${this.$t('templates.dialogs.importFile.errors.unknown_to_node')}: "${dep.to}"`)
+          }
+        }
+      }
+    },
+    formatFileSize (bytes) {
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
     }
   }
 }

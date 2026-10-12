@@ -248,193 +248,91 @@ export default ({
       }
     },
     
-    // Импорт шаблона из другого аккаунта
-    async importTemplate ({commit, dispatch, getters}, {importUserId, importTemplateId}) {
+    async importTemplateFromFile ({commit, getters, dispatch}, templateData) {
       commit('clearError')
       commit('setLoading', true)
+      
       try {
-        console.log('🔍 Importing template:', { importUserId, importTemplateId })
-        
-        // Получаем шаблон для импорта
+        const userId = getters.user?.id
+        if (!userId) {
+          throw new Error('User not authenticated')
+        }
+
+        // 1. Создаем шаблон
         const { data: template, error: templateError } = await supabase
           .from('templates')
-          .select('*')
-          .eq('id', importTemplateId)
-          .eq('access', true)
-          .single()
-        
-        if (templateError) {
-          console.error('❌ Template fetch error:', templateError)
-          throw new Error(`Template not found or not accessible: ${templateError.message}`)
-        }
-        
-        if (!template) {
-          throw new Error('Template not found or not publicly accessible')
-        }
-        
-        console.log('✅ Template found:', template)
-        
-        // Создаем новый шаблон
-        const { data: newTemplate, error: createError } = await supabase
-          .from('templates')
           .insert({
-            user_id: getters.user.id,
-            title: template.title + ' (imported)',
-            description: template.description,
-            access: template.access
+            user_id: userId,
+            title: templateData.title,
+            description: templateData.description,
+            access: true
           })
           .select()
           .single()
-        
-        if (createError) {
-          console.error('❌ Error creating template:', createError)
-          throw new Error(`Failed to create template: ${createError.message}`)
-        }
-        
-        const newTemplateId = newTemplate.id
-        console.log('📝 New template created:', newTemplateId)
-        
-        // Устанавливаем текущий шаблон
-        commit('setCurrentTemplateId', newTemplateId)
-        
-        // Получаем узлы шаблона для импорта
-        const { data: templateNodes, error: nodesError } = await supabase
+
+        if (templateError) throw new Error(`Failed to create template: ${templateError.message}`)
+
+        const newTemplateId = template.id
+
+        // 2. Создаем узлы и строим маппинг локальных ID в реальные UUID
+        const nodeIdMap = {}
+        const nodesToInsert = templateData.nodes.map(node => ({
+          template_id: newTemplateId,
+          title: node.title,
+          type: node.type || '1',
+          description: node.description || '',
+          access: node.access !== undefined ? node.access : true,
+          status: node.status || '1',
+          dependencies_satisfied: node.dependenciesSatisfied !== undefined ? node.dependenciesSatisfied : true,
+          radius: node.radius || 50,
+          top: node.top || 0,
+          left_pos: node.left || 0
+        }))
+
+        const { data: insertedNodes, error: nodesError } = await supabase
           .from('template_nodes')
-          .select('*')
-          .eq('template_id', importTemplateId)
-        
-        if (nodesError) {
-          console.error('❌ Template nodes fetch error:', nodesError)
-          throw new Error(`Failed to fetch template nodes: ${nodesError.message}`)
-        }
-        
-        console.log('📋 Template nodes found:', templateNodes?.length || 0)
-        
-        const templateNodesDictionary = {}
-        
-        if (templateNodes && templateNodes.length > 0) {
-          // Копируем узлы последовательно
-          for (const node of templateNodes) {
-            console.log('📦 Copying node:', node.title)
-            
-            // Создаем узел напрямую через Supabase
-            const { data: newNode, error: nodeError } = await supabase
-              .from('template_nodes')
-              .insert({
-                template_id: newTemplateId,
-                title: node.title,
-                type: node.type,
-                description: node.description,
-                access: node.access,
-                status: node.status,
-                dependencies_satisfied: node.dependencies_satisfied,
-                radius: node.radius,
-                top: node.top,
-                left_pos: node.left_pos
-              })
-              .select()
-              .single()
-            
-            if (nodeError) {
-              console.error('❌ Error creating template node:', nodeError)
-              throw new Error(`Failed to create template node: ${nodeError.message}`)
-            }
-            
-            templateNodesDictionary[node.id] = newNode.id
-            console.log(`🆔 Node mapping: ${node.id} -> ${newNode.id}`)
-            
-            // Добавляем небольшую паузу между запросами
-            await new Promise(resolve => setTimeout(resolve, 100))
+          .insert(nodesToInsert)
+          .select()
+
+        if (nodesError) throw new Error(`Failed to create nodes: ${nodesError.message}`)
+
+        templateData.nodes.forEach((node, index) => {
+          nodeIdMap[node.id] = insertedNodes[index].id
+        })
+
+        // 3. Создаем зависимости
+        if (templateData.dependencies && templateData.dependencies.length > 0) {
+          const depsToInsert = templateData.dependencies.map(dep => ({
+            template_id: newTemplateId,
+            from_node_id: nodeIdMap[dep.from],
+            to_node_id: nodeIdMap[dep.to]
+          })).filter(dep => dep.from_node_id && dep.to_node_id) // Фильтруем на случай ошибок маппинга
+
+          if (depsToInsert.length > 0) {
+            const { error: depsError } = await supabase
+              .from('template_dependencies')
+              .insert(depsToInsert)
+
+            if (depsError) throw new Error(`Failed to create dependencies: ${depsError.message}`)
           }
-          
-          console.log('🗂️ Node mapping completed:', templateNodesDictionary)
         }
-        
-        // Получаем зависимости шаблона
-        const { data: templateDeps, error: depsError } = await supabase
-          .from('template_dependencies')
-          .select('*')
-          .eq('template_id', importTemplateId)
-        
-        if (depsError) {
-          console.error('❌ Template dependencies fetch error:', depsError)
-          throw new Error(`Failed to fetch template dependencies: ${depsError.message}`)
-        }
-        
-        console.log('🔗 Template dependencies found:', templateDeps?.length || 0)
-        
-        // Копируем зависимости
-        if (templateDeps && templateDeps.length > 0) {
-          let createdDepsCount = 0
-          
-          for (const dep of templateDeps) {
-            const fromNodeId = templateNodesDictionary[dep.from_node_id]
-            const toNodeId = templateNodesDictionary[dep.to_node_id]
-            
-            if (fromNodeId && toNodeId) {
-              console.log(`🔗 Copying dependency: ${dep.from_node_id}->${dep.to_node_id} => ${fromNodeId}->${toNodeId}`)
-              
-              const { data: newDep, error: depError } = await supabase
-                .from('template_dependencies')
-                .insert({
-                  template_id: newTemplateId,
-                  from_node_id: fromNodeId,
-                  to_node_id: toNodeId
-                })
-                .select()
-                .single()
-              
-              if (depError) {
-                console.error('❌ Error creating template dependency:', depError)
-                console.log('Dependency data:', {
-                  template_id: newTemplateId,
-                  from_node_id: fromNodeId,
-                  to_node_id: toNodeId
-                })
-                throw new Error(`Failed to create template dependency: ${depError.message}`)
-              }
-              
-              createdDepsCount++
-              console.log(`✅ Dependency created: ${newDep.id}`)
-              
-              // Добавляем небольшую паузу между запросами
-              await new Promise(resolve => setTimeout(resolve, 100))
-            } else {
-              console.warn('⚠️ Skipping dependency - node mapping not found:', {
-                originalFrom: dep.from_node_id,
-                originalTo: dep.to_node_id,
-                mappedFrom: fromNodeId,
-                mappedTo: toNodeId
-              })
-            }
-          }
-          
-          console.log(`✅ Created ${createdDepsCount} dependencies`)
-        } else {
-          console.log('ℹ️ No dependencies to import')
-        }
-        
-        // Добавляем новый шаблон в состояние Vuex
+
+        // 4. Обновляем состояние Vuex
         commit('newTemplate', {
           id: newTemplateId,
-          title: newTemplate.title,
-          description: newTemplate.description,
-          access: newTemplate.access
+          title: template.title,
+          description: template.description,
+          access: template.access
         })
-        
-        console.log('✅ Template import completed successfully')
-        
-        // Возвращаем результат для отладки
-        return { 
-          success: true, 
-          message: 'Template imported successfully', 
-          templateId: newTemplateId,
-          nodesImported: templateNodes?.length || 0,
-          depsImported: templateDeps?.length || 0
+        commit('setCurrentTemplateId', newTemplateId)
+        commit('setLoading', false)
+
+        return {
+          success: true,
+          templateId: newTemplateId
         }
-        
+
       } catch (error) {
-        console.error('❌ Template import error:', error)
         commit('setLoading', false)
         commit('setError', error.message)
         throw error
