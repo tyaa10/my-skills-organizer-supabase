@@ -30,7 +30,7 @@
         .button.button-default.templates-actions-button(@click='importTempClick' v-tooltip.top-center="$t('templates.action_icons.import')")
           font-awesome-icon(:icon="'file-import'")
         .button.button-default.templates-actions-button(@click='importTempFileClick' v-tooltip.top-center="$t('templates.action_icons.import_file')")
-          font-awesome-icon(:icon="'file-arrow-up'")
+          font-awesome-icon(:icon="'upload'")
         .button.button-default.templates-actions-button(v-if="checkTemplate" @click='editTempClick' v-tooltip.top-center="$t('templates.action_icons.edit')")
           font-awesome-icon(:icon="'edit'")
         .button.button-default.templates-actions-button(v-if="checkTemplate" @click='delTempClick' v-tooltip.top-center="$t('templates.action_icons.delete')")
@@ -93,12 +93,45 @@
           .error(v-if="!$v.importTemplate.id.required") {{$t('templates.dialogs.import.id_input.required_error')}}
         // Форма импорта шаблона из JSON-файла
         form(v-if="tempFormMode == 'importFile'" v-on:submit.prevent='')
+          .ui-text-small.ui-text-muted(style="margin-bottom: 12px;")
+            | {{$t('templates.dialogs.importFile.hint')}}
           .form-item
             label.form__label(for='importTemplateFileInput') {{$t('templates.dialogs.importFile.file_input.label')}}
             input.form__input#importTemplateFileInput(type='file' accept='.json' @change='handleFileSelect' ref='fileInput')
           .error(v-if="fileError") {{ fileError }}
           .ui-text-small(v-if="selectedFile && !fileError")
             | {{$t('templates.dialogs.importFile.file_selected')}}: {{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
+          // Кнопка скачивания примера
+          .form-item(style="margin-top: 12px;")
+            a.ui-link(href='#' @click.prevent='downloadSampleFile')
+              font-awesome-icon(:icon="'download'" style="margin-right: 4px;")
+              | {{$t('templates.dialogs.importFile.download_sample')}}
+          // Раскрывающаяся секция со схемой
+          details.ui-details(style="margin-top: 12px;")
+            summary.ui-summary
+              font-awesome-icon(:icon="'info-circle'" style="margin-right: 4px;")
+              | {{$t('templates.dialogs.importFile.schema_title')}}
+            .ui-details-content(style="margin-top: 8px; padding: 10px; background: #f5f5f5; border-radius: 4px;")
+              pre.ui-code-block(style="font-size: 11px; overflow-x: auto; white-space: pre-wrap;")
+                | {
+                |   "title": "{{$t('templates.dialogs.importFile.schema_example_title')}}",
+                |   "description": "{{$t('templates.dialogs.importFile.schema_example_description')}}",
+                |   "nodes": [
+                |     {
+                |       "id": "{{$t('templates.dialogs.importFile.schema_example_node_id')}}",
+                |       "title": "{{$t('templates.dialogs.importFile.schema_example_node_title')}}",
+                |       "type": "1",
+                |       "description": "...",
+                |       "status": "1",
+                |       "radius": 50,
+                |       "top": 0,
+                |       "left": 0
+                |     }
+                |   ],
+                |   "dependencies": [
+                |     { "from": "{{$t('templates.dialogs.importFile.schema_example_dep_from')}}", "to": "{{$t('templates.dialogs.importFile.schema_example_dep_to')}}" }
+                |   ]
+                | }
       .ui-messageBox__footer
         .button.button-light.ui-messageBox-cancel {{formStaticContent.buttons.cancel}}
         .button.button-primary.ui-messageBox-ok(v-if="tempFormMode == 'create' || tempFormMode == 'edit'") {{formStaticContent.buttons.ok}}
@@ -708,6 +741,59 @@ export default {
       if (bytes < 1024) return bytes + ' B'
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+    },
+    downloadSampleFile () {
+      const sample = {
+        title: 'Sample Template',
+        description: 'This is a sample template showing the correct JSON structure for import.',
+        nodes: [
+          {
+            id: 'step_1',
+            title: 'Step 1: Fundamentals',
+            type: '1',
+            description: 'Start with the basics. This node has no dependencies.',
+            status: '1',
+            radius: 50,
+            top: 0,
+            left: 100
+          },
+          {
+            id: 'step_2',
+            title: 'Step 2: Practice',
+            type: '1',
+            description: 'Apply what you learned. Depends on Step 1.',
+            status: '1',
+            radius: 50,
+            top: 150,
+            left: 100
+          },
+          {
+            id: 'step_3',
+            title: 'Step 3: Mastery',
+            type: '1',
+            description: 'Advanced level. Depends on both Step 1 and Step 2.',
+            status: '1',
+            radius: 50,
+            top: 300,
+            left: 100
+          }
+        ],
+        dependencies: [
+          { from: 'step_2', to: 'step_1' },
+          { from: 'step_3', to: 'step_1' },
+          { from: 'step_3', to: 'step_2' }
+        ]
+      }
+      
+      const blob = new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'sample_template.json'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   }
 }
@@ -723,4 +809,25 @@ export default {
     &.selected
       background-color #CCC
       font-weight bold
+  .ui-text-muted
+    color #666
+  .ui-link
+    color #0066cc
+    text-decoration none
+    &:hover
+      text-decoration underline
+  .ui-details
+    border 1px solid #ddd
+    border-radius 4px
+    padding 8px
+    cursor pointer
+  .ui-summary
+    font-weight bold
+    outline none
+    &:hover
+      color #0066cc
+  .ui-code-block
+    margin 0
+    font-family monospace
+    color #333
 </style>

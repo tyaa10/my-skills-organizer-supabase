@@ -165,10 +165,19 @@
       "importFile": {
         "title": "Import from File",
         "description": "Upload a JSON file containing the template definition",
+        "hint": "The file must contain the template title, a list of nodes (each with a unique id), and an optional list of dependencies between them. A dependency arrow goes from the node that requires prerequisites to the prerequisite node.",
         "file_input": {
           "label": "Select JSON file"
         },
         "file_selected": "Selected file",
+        "download_sample": "Download sample file",
+        "schema_title": "File format (JSON schema)",
+        "schema_example_title": "Template title",
+        "schema_example_description": "Template description",
+        "schema_example_node_id": "unique_id",
+        "schema_example_node_title": "Node title",
+        "schema_example_dep_from": "dependent_node_id",
+        "schema_example_dep_to": "prerequisite_node_id",
         "errors": {
           "no_file": "Please select a file",
           "invalid_extension": "File must have a .json extension",
