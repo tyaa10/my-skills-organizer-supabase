@@ -1,157 +1,152 @@
-# Skills Organizer
+# MySkillsOrganizer
 
-> Web application: Skills-organizer for everyone
+🌐 [Русская версия / Russian version](README.ru.md)
 
-A Vue.js application for organizing and managing skills, goals, and dependencies with a visual canvas interface.
+> **A visual, interactive tree of your human development — not just tasks, but the person you are becoming.**
 
-## 🚀 Recent Migrations
+MySkillsOrganizer is a web application designed to help you visualize your goals, skills, and the dependencies between them. It is built on the philosophy of **HumanBuilding (HB)**: the idea that the most valuable product of any useful work is not the external thing you produce, but yourself — your knowledge, abilities, and human qualities developed in the process.
 
-This project has been migrated from:
-- **Firebase to Supabase** - See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for details
-- **Webpack to Vite** - See [VITE_MIGRATION_GUIDE.md](./VITE_MIGRATION_GUIDE.md) for details
+🔗 **[Live Demo](https://my-skills-organizer-supabase.vercel.app/)**  
+📚 **[HumanBuilding Monograph (PDF)](https://github.com/tyaa10/my-skills-organizer-supabase/releases)**  
+💬 **[Community (EN)](https://www.facebook.com/groups/150758748845784)** | **[Community (RU)](https://vk.com/humanbuilders)**
 
-## Features
+---
 
-- **User Authentication**: Secure user registration and login
-- **Visual Canvas**: Interactive canvas for organizing skills and goals
-- **Templates**: Create and manage reusable skill templates
-- **Dependencies**: Define relationships between different skills/goals
-- **Real-time Updates**: Live synchronization across devices
-- **Multi-language Support**: Internationalization support
+## ✨ Features
 
-## Tech Stack
+- **Visual Canvas**: Interactive Fabric.js canvas for organizing skills and goals.
+- **Templates**: Create, manage, and share reusable development templates.
+- **JSON Import (New!)**: Generate a structured development tree in 30 minutes using any LLM (ChatGPT, Claude, etc.) and import it directly via JSON file.
+- **Dependencies**: Define and visualize complex relationships between different skills/goals.
+- **Real-time Updates**: Live synchronization across devices via Supabase.
+- **Multi-language Support**: Full internationalization (i18n) for EN/RU.
 
-- **Frontend**: Vue.js 2, Vuex, Vue Router
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Vue.js 2, Vuex, Vue Router, Vue I18n
 - **Backend**: Supabase (PostgreSQL, Auth, Edge Functions)
 - **Canvas**: Fabric.js
 - **Styling**: Stylus, UIMini CSS Framework
 - **Build Tool**: Vite (migrated from Webpack)
+- **Validation**: Vuelidate
 
-## Quick Start
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js (>= 6.0.0)
-- npm (>= 3.0.0)
-- Supabase account
+- Node.js (>= 16.0.0 recommended)
+- npm (>= 8.0.0)
+- A free [Supabase](https://supabase.com) account
 
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
-   git clone <repository-url>
-   cd my-skills-organizer
+   git clone https://github.com/tyaa10/my-skills-organizer-supabase.git
+   cd my-skills-organizer-supabase
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up Supabase**
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Get your Project URL and anon key from Settings → API
-   - **Option A**: Create a `.env` file with:
+
+   - Create a new project at [supabase.com](https://supabase.com).
+   - Go to **Settings → API** and copy your `Project URL` and `anon public` key.
+   - Create a `.env` file in the root directory and add:
+
      ```env
-     SUPABASE_URL=https://your-project-id.supabase.co
-     SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+     VITE_SUPABASE_URL=https://your-project-id.supabase.co
+     VITE_SUPABASE_ANON_KEY=your_anon_key_here
      ```
-   - **Option B**: Update `src/helpers/supabaseConfig.js` directly with your credentials
-   - Run the SQL schema from `supabase-schema.sql` in your Supabase dashboard
-   - See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions
+
+   - Go to the **SQL Editor** in your Supabase dashboard and run the script from `supabase-schema.sql` to create all necessary tables and Row Level Security (RLS) policies.
+   - See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions.
 
 4. **Start development server**
+
    ```bash
    npm run dev
    ```
 
 5. **Open your browser**
-   Navigate to `http://localhost:8080`
 
-## Available Scripts
-
-```bash
-# Development
-npm run dev          # Start Vite development server
-npm run start        # Alias for dev
-
-# Building
-npm run build        # Build for production with Vite
-npm run preview      # Preview production build
-
-# Testing
-npm run unit         # Run unit tests
-npm run e2e          # Run e2e tests
-npm test             # Run all tests
-
-# Supabase
-npm run supabase:start    # Start local Supabase
-npm run supabase:stop     # Stop local Supabase
-npm run supabase:reset    # Reset local database
-npm run supabase:deploy   # Deploy Edge Functions
-npm run supabase:logs     # View function logs
-```
-
-## Project Structure
-
-```
-src/
-├── components/          # Vue components
-│   ├── Auth/           # Authentication components
-│   ├── Common/         # Shared components
-│   └── ...
-├── helpers/            # Utility functions
-│   └── supabaseConfig.js  # Supabase configuration
-├── lang/               # Internationalization files
-├── plugins/            # Vue plugins
-├── router/             # Vue Router configuration
-├── store/              # Vuex store modules
-│   ├── user.js         # User management
-│   ├── elems.js        # Nodes/elements management
-│   ├── templates.js    # Templates management
-│   └── dependencies.js # Dependencies management
-└── assets/             # Static assets
-
-supabase/
-├── functions/          # Edge Functions
-│   └── aims/          # API endpoint
-└── config.toml        # Supabase configuration
-```
-
-## Database Schema
-
-The application uses PostgreSQL with the following main tables:
-- `users` - User profiles
-- `userdata` - User metadata
-- `nodes` - Skills/goals nodes
-- `templates` - Reusable templates
-- `template_nodes` - Nodes within templates
-- `dependencies` - Relationships between nodes
-- `template_dependencies` - Dependencies within templates
-
-## API Endpoints
-
-- `GET /functions/v1/aims` - Get public goals from all users
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is private and proprietary.
-
-## Support
-
-For issues and questions:
-- Check the [Migration Guide](./MIGRATION_GUIDE.md)
-- Review [Supabase Documentation](https://supabase.com/docs)
-- Open an issue in the repository
+   Navigate to `http://localhost:3000` (or the port shown in your terminal).
 
 ---
 
-**Note**: This project was migrated from Firebase to Supabase. If you're looking for the original Firebase version, check the git history.
+## 📂 Project Structure
+
+```text
+src/
+├── components/          # Vue components (Auth, Common, FabricCanvas, etc.)
+├── helpers/             # Utility functions (e.g., supabaseConfig.js)
+├── lang/                # Internationalization files (en.json, ru.json)
+├── plugins/             # Vue plugins (i18n, etc.)
+├── router/              # Vue Router configuration
+├── store/               # Vuex store modules (user, elems, templates, dependencies)
+└── assets/              # Static assets (CSS, Stylus, images)
+
+supabase/
+├── functions/           # Edge Functions (e.g., aims API)
+└── config.toml          # Supabase local configuration
+```
+
+---
+
+## 🗄️ Database Schema
+
+The application uses PostgreSQL with the following main tables:
+
+- `users` / `userdata` — User profiles and metadata
+- `nodes` — Skills/goals nodes
+- `templates` — Reusable templates
+- `template_nodes` — Nodes within templates
+- `dependencies` — Relationships between nodes
+- `template_dependencies` — Dependencies within templates
+
+---
+
+## 📡 API Endpoints
+
+- `GET /functions/v1/aims` — Get public goals from all users.
+
+---
+
+## 🤝 Contributing
+
+This project is open source and available under the [MIT License](LICENSE).
+
+We believe that human development should be a shared, collaborative process. If you are a developer, educator, or philosopher who believes that human growth should be visual, structured, and shared — this is for you.
+
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a Pull Request.
+
+**Particularly welcome contributions:**
+
+- Export current template to JSON (for LLM editing and re-import).
+- Client-side JSON validation with friendly error messages.
+- Direct LLM API integration (one-click template generation).
+- Visual schema editor with drag-and-drop.
+- Mobile adaptation.
+
+---
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+*Built with stubborn hope by Yurii Trofimenko, 2019–2026.*
